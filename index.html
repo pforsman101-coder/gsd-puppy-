@@ -1,120 +1,70 @@
-import os
-import re
-import json
-import time
-import random
-import smtplib
-from email.mime.text import MIMEText
-import requests
-from bs4 import BeautifulSoup
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSD Puppy Finder Dashboard</title>
+    <script src="https://tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
 
-ZIP_CODE = "07724"
-TARGET_URLS = [
-    "https://rescueme.org",
-    "https://rescueme.org",
-    "https://rescueme.org"
-]
+    <div class="max-w-5xl mx-auto px-4 py-8">
+        <header class="border-b border-gray-800 pb-6 mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-extrabold text-amber-500 tracking-tight">GSD Locator</h1>
+                <p class="text-sm text-gray-400 mt-1">Target: Female, Purebred, &lt; 1 Year Old (Within 300mi of 07724)</p>
+            </div>
+            <span class="bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs px-3 py-1.5 rounded-full font-semibold">
+                ● Live Scraper Loop Active
+            </span>
+        </header>
 
-JSON_FILE = "listings.json"
-EMAIL_TO = "pforsman101@gmail.com"
+        <div id="matches-grid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <!-- Dynamic data injects here -->
+            <div id="loading" class="col-span-full text-center text-gray-500 py-12">
+                Retrieving active database matches...
+            </div>
+        </div>
+    </div>
 
-# Xfinity Mobile routes texts seamlessly through Verizon's SMS gateway
-SMS_TARGETS = [
-    "7322451147@vtext.com"
-]
+    <script>
+        async function fetchMatches() {
+            const grid = document.getElementById('matches-grid');
+            try {
+                const response = await fetch('./listings.json');
+                if (!response.ok) throw new Error("No matches database found yet.");
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full text-center text-gray-400 py-12">No puppies found yet. Scraper is still checking regional networks...</div>`;
+                    return;
+                }
 
-# Random browsers to bypass data-center scraping blocks
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0"
-]
+                grid.innerHTML = data.map(dog => `
+                    <div class="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden shadow-lg p-6 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-4">
+                                <h3 class="text-xl font-bold text-white">${dog.name}</h3>
+                                <span class="bg-amber-500/10 text-amber-400 text-xs px-2.5 py-1 rounded border border-amber-500/20 font-medium">
+                                    Puppy
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-400 mb-1">📍 Region: <span class="text-gray-200">${dog.location}</span></p>
+                            <p class="text-xs text-gray-500 mb-6">Found: ${dog.time_found || 'Recently'}</p>
+                        </div>
+                        <a href="${dog.link}" target="_blank" class="block text-center w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-2.5 px-4 rounded-lg transition-colors text-sm">
+                            View Rescue Profile →
+                        </a>
+                    </div>
+                `).join('');
 
-def send_alerts(dog_name, dog_url):
-    sender_email = os.environ.get("SENDER_EMAIL")
-    sender_password = os.environ.get("SENDER_PASSWORD")
-    
-    if not sender_email or not sender_password:
-        print("Alert skipped: Missing sender configurations.")
-        return
-
-    subject = f"🚨 GSD Puppy Match: {dog_name}!"
-    body = f"Female purebred GSD under 1 year old found: {dog_name}\nLink: {dog_url}"
-    
-    try:
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = sender_email
-        msg['To'] = EMAIL_TO
+            } catch (err) {
+                grid.innerHTML = `<div class="col-span-full text-center text-gray-400 py-12">Waiting for first automated match cycle to write files. Check your mobile notifications!</div>`;
+            }
+        }
         
-        with smtplib.SMTP_SSL("://gmail.com", 465) as server:
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, [EMAIL_TO], msg.as_string())
-            print("📬 Notification email successfully dispatched.")
-            
-            for sms_gateway in SMS_TARGETS:
-                sms_msg = MIMEText(f"GSD Puppy Alert: {dog_name}! Link: {dog_url}")
-                sms_msg['From'] = sender_email
-                sms_msg['To'] = sms_gateway
-                server.sendmail(sender_email, [sms_gateway], sms_msg.as_string())
-            print("📱 Text alert sent to your Xfinity phone.")
-    except Exception as e:
-        print(f"Alert error: {e}")
+        fetchMatches();
+    </script>
+</body>
+</html>
 
-def load_existing_matches():
-    if os.path.exists(JSON_FILE):
-        try:
-            with open(JSON_FILE, 'r') as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return []
-    return []
-
-def scan_rescues():
-    print("Searching regional GSD networks...")
-    existing_matches = load_existing_matches()
-    existing_links = {dog['link'] for dog in existing_matches}
-    new_matches_found = False
-    
-    for url in TARGET_URLS:
-        try:
-            headers = {'User-Agent': random.choice(USER_AGENTS)}
-            response = requests.get(url, headers=headers, timeout=15)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            for listing in soup.find_all('table', class_='DogListing') or soup.find_all(class_='id_card_or_table_class'):
-                text_content = listing.get_text().lower()
-                
-                is_purebred = "purebred" in text_content or "mix" not in text_content
-                is_female = "female" in text_content
-                is_puppy = any(x in text_content for x in ["puppy", "baby"]) or \
-                           any(int(m) < 12 for m in re.findall(r'(\d+)\s*month', text_content))
-                
-                if is_purebred and is_female and is_puppy:
-                    name_element = listing.find(class_='dog_name')
-                    dog_name = name_element.text.strip() if name_element else "Female GSD Puppy"
-                    dog_link = url
-                    
-                    if dog_link not in existing_links:
-                        new_dog = {
-                            "name": dog_name,
-                            "location": url.split('/')[-1],
-                            "link": dog_link,
-                            "time_found": time.strftime("%Y-%m-%d %H:%M:%S")
-                        }
-                        existing_matches.append(new_dog)
-                        new_matches_found = True
-                        send_alerts(dog_name, dog_link)
-                        
-            time.sleep(random.uniform(2.0, 4.0))
-                        
-        except Exception as e:
-            print(f"Skipping network {url} due to technical connection: {e}")
-            
-    if new_matches_found:
-        with open(JSON_FILE, 'w') as f:
-            json.dump(existing_matches, f, indent=4)
-        print("Database updated with new entries.")
-
-if __name__ == "__main__":
-    scan_rescues()
