@@ -20,7 +20,6 @@
         </header>
 
         <div id="matches-grid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <!-- Dynamic data injects here -->
             <div id="loading" class="col-span-full text-center text-gray-500 py-12">
                 Retrieving active database matches...
             </div>
@@ -35,7 +34,7 @@
                 if (!response.ok) throw new Error("No matches database found yet.");
                 const data = await response.json();
                 
-                if (data.length === 0) {
+                if (!data || data.length === 0) {
                     grid.innerHTML = `<div class="col-span-full text-center text-gray-400 py-12">No puppies found yet. Scraper is still checking regional networks...</div>`;
                     return;
                 }
@@ -62,9 +61,7 @@
                 grid.innerHTML = `<div class="col-span-full text-center text-gray-400 py-12">Waiting for first automated match cycle to write files. Check your mobile notifications!</div>`;
             }
         }
-        
         fetchMatches();
     </script>
 </body>
 </html>
-
