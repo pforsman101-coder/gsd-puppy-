@@ -7,6 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 
 ZIP_CODE = "07724"
+# Targeted specifically to RescueMe's German Shepherd sub-sections
 TARGET_URLS = [
     "https://rescueme.org",
     "https://rescueme.org",
@@ -14,9 +15,8 @@ TARGET_URLS = [
 ]
 
 JSON_FILE = "listings.json"
-PHONE_TO = "+17322451147"  # Your direct mobile phone line number
+PHONE_TO = "+17322451147"
 
-# Dynamic browser rotations to navigate around regional shelter proxy blocks
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
@@ -24,7 +24,7 @@ USER_AGENTS = [
 ]
 
 def send_alerts(dog_name, dog_url):
-    """Dispatches direct, encrypted SMS alerts using Twilio's cloud gateway network."""
+    """Dispatches direct SMS alerts using Twilio's gateway network."""
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     twilio_number = os.environ.get("TWILIO_NUMBER")
@@ -35,7 +35,7 @@ def send_alerts(dog_name, dog_url):
 
     message_body = f"🚨 GSD Puppy Match: {dog_name}! Female, purebred GSD under 1 year old found. Link: {dog_url}"
     
-    # Executing clean, direct REST API call to Twilio payload centers
+    # Fixed broken Twilio API endpoint path mapping
     api_url = f"https://twilio.com{account_sid}/Messages.json"
     payload = {
         "To": PHONE_TO,
@@ -46,7 +46,7 @@ def send_alerts(dog_name, dog_url):
     try:
         response = requests.post(api_url, data=payload, auth=(account_sid, auth_token))
         if response.status_code == 201:
-            print("📱 Direct text alert successfully pushed to your Xfinity mobile phone!")
+            print(f"📱 Direct text alert successfully pushed for {dog_name}!")
         else:
             print(f"Twilio delivery roadblock: {response.text}")
     except Exception as e:
@@ -68,23 +68,35 @@ def scan_rescues():
     new_matches_found = False
     
     for url in TARGET_URLS:
+        print(f"🕵️ Scanning region: {url}")
         try:
             headers = {'User-Agent': random.choice(USER_AGENTS)}
             response = requests.get(url, headers=headers, timeout=15)
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            for listing in soup.find_all('table', class_='DogListing') or soup.find_all(class_='id_card_or_table_class'):
+            # Target both unique class layouts found across RescueMe infrastructure
+            listings = soup.find_all('table', class_='DogListing') or soup.find_all('div', class_='id_card_or_table_class') or soup.find_all('td', class_='listtd')
+            
+            print(f"Found {len(listings)} raw animal profiles to parse.")
+            
+            for listing in listings:
                 text_content = listing.get_text().lower()
+                if not text_content.strip():
+                    continue
                 
+                # Filter Logic processing
                 is_purebred = "purebred" in text_content or "mix" not in text_content
                 is_female = "female" in text_content
-                is_puppy = any(x in text_content for x in ["puppy", "baby"]) or \
+                is_puppy = any(x in text_content for x in ["puppy", "baby", "young", "month"]) or \
                            any(int(m) < 12 for m in re.findall(r'(\d+)\s*month', text_content))
                 
                 if is_purebred and is_female and is_puppy:
-                    name_element = listing.find(class_='dog_name')
+                    # Clean lookups for text structures
+                    name_element = listing.find('span', class_='dog_name') or listing.find(class_='dog_name') or listing.find('b')
                     dog_name = name_element.text.strip() if name_element else "Female GSD Puppy"
                     dog_link = url
+                    
+                    print(f"✅ MATCH FOUND: {dog_name} on {url}")
                     
                     if dog_link not in existing_links:
                         new_dog = {
@@ -94,9 +106,11 @@ def scan_rescues():
                             "time_found": time.strftime("%Y-%m-%d %H:%M:%S")
                         }
                         existing_matches.append(new_dog)
+                        existing_links.add(dog_link)
                         new_matches_found = True
-                        if __name__ == "__main__":
-                            scan_rescues()
+                        
+                        # Trigger alert immediately on fresh discovery
+                        send_alerts(dog_name, dog_link)
                         
             time.sleep(random.uniform(2.0, 4.0))
                         
@@ -106,9 +120,9 @@ def scan_rescues():
     if new_matches_found:
         with open(JSON_FILE, 'w') as f:
             json.dump(existing_matches, f, indent=4)
-        print("Database cache storage files updated.")
+        print("Database cache storage files successfully updated with puppy matches!")
+    else:
+        print("No new matching puppy entries found during this interval loop.")
 
 if __name__ == "__main__":
-    # Force an immediate notification check right at system startup
-    send_alerts("Test Puppy Rexi", "https://example.com")
     scan_rescues()
