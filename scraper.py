@@ -75,19 +75,21 @@ def scan_rescues():
                 is_puppy = any(x in text_content for x in ["puppy", "baby", "weeks", "6 month", "8 month", "young"])
                 
                 if is_gsd and is_female and is_puppy:
-                    # Look for the first large bold text element inside the profile box
+                    # Safely locate the bold text element header
                     name_element = item.find('b') or item.find('strong')
-                    clean_name = "German Shepherd Puppy"
+                    clean_name = "Available GSD Puppy"
                     
                     if name_element:
                         raw_text = name_element.text.strip()
-                        # Extract the first line safely without nesting list methods
-                        first_line = raw_text.split('\n')[0]
-                        clean_name = first_line.split('(')[0].strip()
+                        # Fixed the list assignment tracking bug cleanly
+                        lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
+                        if lines:
+                            first_line = lines[0]
+                            clean_name = first_line.split('(')[0].strip()
                     
-                    # If it's still too generic, fallback safely instead of throwing it away
-                    if not clean_name or len(clean_name) > 30:
-                        clean_name = "Available GSD Puppy"
+                    # Prevent accidental matching of global website category header tags
+                    if "german shepherd" in clean_name.lower() and len(clean_name) > 20:
+                        clean_name = "Female German Shepherd Puppy"
                     
                     unique_link = f"{url}#id_{abs(hash(text_content[:60]))}"
                     
