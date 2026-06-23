@@ -81,7 +81,7 @@ def scan_rescues():
                     bold_title = item.find(['b', 'strong'])
                     raw_name = bold_title.text.strip() if bold_title else "Female GSD Puppy"
                     
-                    # FIXED: Clean out newlines and extra parenthetical markers safely
+                    #  FIXED LINE (What you should paste in)
                     clean_name = raw_name.split('\n')[0].split('(')[0].strip()
                     
                     if len(clean_name) > 30 or len(clean_name) < 2:
