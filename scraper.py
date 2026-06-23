@@ -96,7 +96,7 @@ def scan_rescues():
                         existing_matches.append(new_dog)
                         new_matches_found = True
                         if __name__ == "__main__":
-    scan_rescues()
+                            scan_rescues()
                         
             time.sleep(random.uniform(2.0, 4.0))
                         
