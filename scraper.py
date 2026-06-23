@@ -77,14 +77,14 @@ def scan_rescues():
                 is_puppy = any(x in text_content for x in ["puppy", "baby", "weeks", "6 month", "8 month", "young"])
                 
                 if is_gsd and is_female and is_puppy:
-                    # Clean out individual profile headings for Vercel formatting rules
-                    bold_title = item.find(['b', 'strong'])
-                    raw_name = bold_title.text.strip() if bold_title else "Female GSD Puppy"
+                    # NEW NAME EXTRACTION LOGIC: Grab the specific title link text instead of the generic bold header
+                    link_element = item.find('a', href=True)
+                    if link_element and link_element.text.strip():
+                        clean_name = link_element.text.strip().split('\n')[0].split('(')[0].strip()
+                    else:
+                        clean_name = "German Shepherd Puppy"
                     
-                    #  FIXED LINE (What you should paste in)
-                    clean_name = raw_name.split('\n')[0].split('(')[0].strip()
-                    
-                    if len(clean_name) > 30 or len(clean_name) < 2:
+                    if len(clean_name) > 30 or len(clean_name) < 2 or "rescue" in clean_name.lower():
                         clean_name = "German Shepherd Puppy"
                     
                     # Generate a unique profile index key using string hashes
@@ -113,6 +113,7 @@ def scan_rescues():
         print("Database array completely updated with fresh puppy datasets.")
     else:
         print("No new matching puppy entries logged.")
+
 
 if __name__ == "__main__":
     scan_rescues()
