@@ -22,13 +22,12 @@ USER_AGENTS = [
 ]
 
 def send_alerts(dog_name, dog_url):
-    """Dispatches direct SMS alerts using Twilio's gateway network."""
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     twilio_number = os.environ.get("TWILIO_NUMBER")
     
     if not account_sid or not auth_token or not twilio_number:
-        print("Alert skipped: Twilio keys missing.")
+        print("Alert skipped: Twilio credentials missing.")
         return
 
     message_body = f"🚨 GSD Puppy Match: {dog_name}! Female GSD under 1 year old found. Link: {dog_url}"
@@ -37,7 +36,7 @@ def send_alerts(dog_name, dog_url):
     
     try:
         requests.post(api_url, data=payload, auth=(account_sid, auth_token))
-        print(f"📱 Direct text alert successfully pushed for {dog_name}!")
+        print(f"📱 Alert sent for {dog_name}!")
     except Exception as e:
         print(f"SMS Error: {e}")
 
@@ -71,21 +70,33 @@ def scan_rescues():
                 if not text_content or len(text_content.strip()) < 40:
                     continue
                 
-                # Rigid filter parameters targeting Shepherd layouts explicitly
                 is_gsd = "shepherd" in text_content or "gsd" in text_content
                 is_female = "female" in text_content or "(f)" in text_content
                 is_puppy = any(x in text_content for x in ["puppy", "baby", "weeks", "6 month", "8 month", "young"])
                 
                 if is_gsd and is_female and is_puppy:
-                    # Target link element anchors directly
-                    link_element = item.find('a', href=True)
+                    # Find links that go to specific dog profile IDs, skipping main category headers
+                    dog_link_element = None
+                    for a in item.find_all('a', href=True):
+                        if "id=" in a['href'] or "num=" in a['href'] or "/dog/" in a['href']:
+                            dog_link_element = a
+                            break
                     
-                    if link_element and link_element.text.strip():
-                        clean_name = link_element.text.strip()
+                    # Fallback to any valid link inside the profile box if an explicit pattern isn't matched
+                    if not dog_link_element:
+                        dog_link_element = item.find('a', href=True)
+                        
+                    if dog_link_element and dog_link_element.text.strip():
+                        raw_text = dog_link_element.text.strip()
+                        # Clean out common multi-line titles and grab the first segment
+                        clean_name = raw_text.split('\n')[0].split('(')[0].strip()
                     else:
-                        clean_name = "German Shepherd Puppy"
+                        clean_name = "Available GSD Puppy"
+                        
+                    # Skip it if it accidental matched global header tags
+                    if "german shepherd" in clean_name.lower() and len(clean_name) > 20:
+                        continue
                     
-                    # Generate a unique profile index key using string hashes
                     unique_link = f"{url}#id_{abs(hash(text_content[:60]))}"
                     
                     if unique_link not in existing_links:
