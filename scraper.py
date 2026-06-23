@@ -75,27 +75,19 @@ def scan_rescues():
                 is_puppy = any(x in text_content for x in ["puppy", "baby", "weeks", "6 month", "8 month", "young"])
                 
                 if is_gsd and is_female and is_puppy:
-                    # Find links that go to specific dog profile IDs, skipping main category headers
-                    dog_link_element = None
-                    for a in item.find_all('a', href=True):
-                        if "id=" in a['href'] or "num=" in a['href'] or "/dog/" in a['href']:
-                            dog_link_element = a
-                            break
+                    # Look for the first large bold text element inside the profile box
+                    name_element = item.find('b') or item.find('strong')
+                    clean_name = "German Shepherd Puppy"
                     
-                    # Fallback to any valid link inside the profile box if an explicit pattern isn't matched
-                    if not dog_link_element:
-                        dog_link_element = item.find('a', href=True)
-                        
-                    if dog_link_element and dog_link_element.text.strip():
-                        raw_text = dog_link_element.text.strip()
-                        # Clean out common multi-line titles and grab the first segment
-                        clean_name = raw_text.split('\n')[0].split('(')[0].strip()
-                    else:
+                    if name_element:
+                        raw_text = name_element.text.strip()
+                        # Extract the first line safely without nesting list methods
+                        first_line = raw_text.split('\n')[0]
+                        clean_name = first_line.split('(')[0].strip()
+                    
+                    # If it's still too generic, fallback safely instead of throwing it away
+                    if not clean_name or len(clean_name) > 30:
                         clean_name = "Available GSD Puppy"
-                        
-                    # Skip it if it accidental matched global header tags
-                    if "german shepherd" in clean_name.lower() and len(clean_name) > 20:
-                        continue
                     
                     unique_link = f"{url}#id_{abs(hash(text_content[:60]))}"
                     
