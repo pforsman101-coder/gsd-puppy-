@@ -84,10 +84,14 @@ def scan_rescues():
                 if not text_content.strip():
                     continue
                 
-                # Filter Logic processing
-                is_purebred = "purebred" in text_content or "mix" not in text_content
-                is_female = "female" in text_content
-                is_puppy = any(x in text_content for x in ["puppy", "baby", "young", "month"]) or \
+               # Relax purebred rule to allow German Shepherd Mixes
+                is_purebred = "german shepherd" in text_content
+                
+                # Check for female
+                is_female = "female" in text_content or "(f)" in text_content
+                
+                # Broaden age detection for puppies under 1 year old
+                is_puppy = any(x in text_content for x in ["puppy", "baby", "weeks", "6 months", "8 months"]) or \
                            any(int(m) < 12 for m in re.findall(r'(\d+)\s*month', text_content))
                 
                 if is_purebred and is_female and is_puppy:
